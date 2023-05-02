@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,7 +16,10 @@ type TallyCredsConf struct {
 }
 
 type TallyConf struct {
-	Hosts map[string]TallyCredsConf `yaml:"hosts"`
+	Sum      string                    `yaml:"sum"`
+	BiosBlob string                    `yaml:"bios_blob"`
+	BmcBlob  string                    `yaml:"bmc_blob"`
+	Hosts    map[string]TallyCredsConf `yaml:"hosts"`
 }
 
 func main() {
@@ -29,5 +34,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(conf.Hosts)
+	fmt.Println("path to sum command:", conf.Sum)
+	fmt.Println("path to bmc blob:", conf.BmcBlob)
+	fmt.Println("path to bios blob:", conf.BiosBlob)
+
+	for host, creds := range conf.Hosts {
+		fmt.Println("host:", host)
+
+		//cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "GetBmcInfo")
+		cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "UpdateBMC", "--file", conf.BmcBlob)
+		cmd.Stdout = os.Stdout
+		if err := cmd.Run(); err != nil {
+			fmt.Println("could not run command: ", err)
+		}
+	}
 }
