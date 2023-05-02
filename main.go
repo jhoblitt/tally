@@ -43,6 +43,9 @@ func main() {
 	defer limiter.WaitAndClose()
 
 	for host, creds := range conf.Hosts {
+		host := host
+		creds := creds
+
 		limiter.Execute(func() {
 			fmt.Println("host:", host)
 			//cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "GetBmcInfo")
