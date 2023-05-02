@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/korovkin/limiter"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,14 +39,27 @@ func main() {
 	fmt.Println("path to bmc blob:", conf.BmcBlob)
 	fmt.Println("path to bios blob:", conf.BiosBlob)
 
-	for host, creds := range conf.Hosts {
-		fmt.Println("host:", host)
+	limiter := limiter.NewConcurrencyLimiter(5)
+	defer limiter.WaitAndClose()
 
-		//cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "GetBmcInfo")
-		cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "UpdateBMC", "--file", conf.BmcBlob)
-		cmd.Stdout = os.Stdout
-		if err := cmd.Run(); err != nil {
-			fmt.Println("could not run command: ", err)
-		}
+	for host, creds := range conf.Hosts {
+		limiter.Execute(func() {
+			fmt.Println("host:", host)
+			//cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "GetBmcInfo")
+			cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "UpdateBMC", "--file", conf.BmcBlob)
+			cmd.Stdout = os.Stdout
+			if err := cmd.Run(); err != nil {
+				fmt.Println("could not run command: ", err)
+			}
+
+			fmt.Println("host:", host)
+			cmd = exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "UpdateBios", "--file", conf.BmcBlob, "--reboot", "--preserve_setting")
+			cmd.Stdout = os.Stdout
+			if err := cmd.Run(); err != nil {
+				fmt.Println("could not run command: ", err)
+			}
+		})
 	}
+
+	limiter.WaitAndClose()
 }
