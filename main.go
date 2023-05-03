@@ -23,6 +23,17 @@ type TallyConf struct {
 	Hosts    map[string]TallyCredsConf `yaml:"hosts"`
 }
 
+func sum_cmd(conf TallyConf, host string, creds TallyCredsConf, cmds ...string) {
+	fmt.Println("running sum command on host:", host)
+
+	args := append([]string{"-i", host, "-u", creds.User, "-p", creds.Pass}, cmds...)
+	cmd := exec.Command(conf.Sum, args...)
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		fmt.Println("could not run command: ", err)
+	}
+}
+
 func main() {
 	raw_conf, err := ioutil.ReadFile("tally.yaml")
 	if err != nil {
@@ -47,20 +58,10 @@ func main() {
 		creds := creds
 
 		limiter.Execute(func() {
-			fmt.Println("host:", host)
-			//cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "GetBmcInfo")
-			cmd := exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "UpdateBMC", "--file", conf.BmcBlob)
-			cmd.Stdout = os.Stdout
-			if err := cmd.Run(); err != nil {
-				fmt.Println("could not run command: ", err)
-			}
-
-			fmt.Println("host:", host)
-			cmd = exec.Command(conf.Sum, "-i", host, "-u", creds.User, "-p", creds.Pass, "-c", "UpdateBios", "--file", conf.BmcBlob, "--reboot", "--preserve_setting")
-			cmd.Stdout = os.Stdout
-			if err := cmd.Run(); err != nil {
-				fmt.Println("could not run command: ", err)
-			}
+			sum_cmd(conf, host, creds, "-c", "GetBmcInfo")
+			sum_cmd(conf, host, creds, "-c", "GetBiosInfo")
+			sum_cmd(conf, host, creds, "-c", "UpdateBMC", "--file", conf.BmcBlob)
+			sum_cmd(conf, host, creds, "-c", "UpdateBios", "--file", conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
 		})
 	}
 
