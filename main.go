@@ -39,7 +39,7 @@ func main() {
 	fmt.Println("path to bmc blob:", conf.BmcBlob)
 	fmt.Println("path to bios blob:", conf.BiosBlob)
 
-	limiter := limiter.NewConcurrencyLimiter(5)
+	limiter := limiter.NewConcurrencyLimiter(10)
 	defer limiter.WaitAndClose()
 
 	for host, creds := range conf.Hosts {
