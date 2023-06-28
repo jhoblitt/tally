@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 
 	"github.com/jhoblitt/tally/conf"
+	"github.com/jhoblitt/tally/op"
 	"github.com/korovkin/limiter"
 )
 
@@ -21,6 +23,9 @@ func sum_cmd(conf conf.TallyConf, host string, creds conf.TallyCredsConf, cmds .
 }
 
 func main() {
+	var use_op = flag.Bool("op", false, "use op (1password cli) to get credentials")
+	flag.Parse()
+
 	c := conf.ParseFile("tally.yaml")
 
 	fmt.Println("path to sum command:", c.Sum)
@@ -33,6 +38,17 @@ func main() {
 	for host, creds := range c.Hosts {
 		host := host
 		creds := creds
+
+		// conf file creds take precedence over op creds
+		if creds.User == "" || creds.Pass == "" {
+			if *use_op {
+				item := op.ItemGet(host)
+				creds = op.Item2TallyCreds(item)
+			} else {
+				fmt.Println("no credentials for host:", host)
+				continue
+			}
+		}
 
 		limiter.Execute(func() {
 			sum_cmd(c, host, creds, "-c", "GetBmcInfo")
