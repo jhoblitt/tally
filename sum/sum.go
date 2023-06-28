@@ -12,7 +12,7 @@ type SumBMC struct {
 	Date    string
 }
 
-func ParseBMC(text string) (SumBMC, error) {
+func ParseBmcInfo(text string) (SumBMC, error) {
 	var bmc SumBMC
 
 	re, err := regexp.Compile(`\.{3,}(\S+)$`)
