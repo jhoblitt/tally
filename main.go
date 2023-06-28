@@ -41,6 +41,4 @@ func main() {
 			sum_cmd(c, host, creds, "-c", "UpdateBios", "--file", c.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
 		})
 	}
-
-	limiter.WaitAndClose()
 }
