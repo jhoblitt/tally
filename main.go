@@ -1,29 +1,17 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 
+	"github.com/jhoblitt/tally/conf"
+	"github.com/jhoblitt/tally/op"
 	"github.com/korovkin/limiter"
-	"gopkg.in/yaml.v3"
 )
 
-type TallyCredsConf struct {
-	User string `yaml:"user"`
-	Pass string `yaml:"pass"`
-}
-
-type TallyConf struct {
-	Sum      string                    `yaml:"sum"`
-	BiosBlob string                    `yaml:"bios_blob"`
-	BmcBlob  string                    `yaml:"bmc_blob"`
-	Hosts    map[string]TallyCredsConf `yaml:"hosts"`
-}
-
-func sum_cmd(conf TallyConf, host string, creds TallyCredsConf, cmds ...string) {
+func sum_cmd(conf conf.TallyConf, host string, creds conf.TallyCredsConf, cmds ...string) {
 	fmt.Println("running sum command on host:", host)
 
 	args := append([]string{"-i", host, "-u", creds.User, "-p", creds.Pass}, cmds...)
@@ -35,35 +23,38 @@ func sum_cmd(conf TallyConf, host string, creds TallyCredsConf, cmds ...string) 
 }
 
 func main() {
-	raw_conf, err := ioutil.ReadFile("tally.yaml")
-	if err != nil {
-		log.Fatal(err)
-	}
+	var use_op = flag.Bool("op", false, "use op (1password cli) to get credentials")
+	flag.Parse()
 
-	var conf TallyConf
-	err = yaml.Unmarshal(raw_conf, &conf)
-	if err != nil {
-		log.Fatal(err)
-	}
+	c := conf.ParseFile("tally.yaml")
 
-	fmt.Println("path to sum command:", conf.Sum)
-	fmt.Println("path to bmc blob:", conf.BmcBlob)
-	fmt.Println("path to bios blob:", conf.BiosBlob)
+	fmt.Println("path to sum command:", c.Sum)
+	fmt.Println("path to bmc blob:", c.BmcBlob)
+	fmt.Println("path to bios blob:", c.BiosBlob)
 
 	limiter := limiter.NewConcurrencyLimiter(10)
 	defer limiter.WaitAndClose()
 
-	for host, creds := range conf.Hosts {
+	for host, creds := range c.Hosts {
 		host := host
 		creds := creds
 
+		// conf file creds take precedence over op creds
+		if creds.User == "" || creds.Pass == "" {
+			if *use_op {
+				item := op.ItemGet(host)
+				creds = op.Item2TallyCreds(item)
+			} else {
+				fmt.Println("no credentials for host:", host)
+				continue
+			}
+		}
+
 		limiter.Execute(func() {
-			sum_cmd(conf, host, creds, "-c", "GetBmcInfo")
-			sum_cmd(conf, host, creds, "-c", "GetBiosInfo")
-			sum_cmd(conf, host, creds, "-c", "UpdateBMC", "--file", conf.BmcBlob)
-			sum_cmd(conf, host, creds, "-c", "UpdateBios", "--file", conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
+			sum_cmd(c, host, creds, "-c", "GetBmcInfo")
+			sum_cmd(c, host, creds, "-c", "GetBiosInfo")
+			sum_cmd(c, host, creds, "-c", "UpdateBMC", "--file", c.BmcBlob)
+			sum_cmd(c, host, creds, "-c", "UpdateBios", "--file", c.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
 		})
 	}
-
-	limiter.WaitAndClose()
 }
