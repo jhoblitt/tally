@@ -51,3 +51,10 @@ Local BMC image file...../home/jhoblitt/Dropbox/lsst-it/sm/AS-1114S-WN10RT/bmc/B
 		}
 	}
 }
+
+func TestNewSum(t *testing.T) {
+	sum := NewSum("/does/not/exist")
+	if sum == nil {
+		t.Fatalf("unexpected failure in New()")
+	}
+}

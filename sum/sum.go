@@ -12,6 +12,10 @@ type SumBMC struct {
 	Date    string
 }
 
+type Sum struct {
+	Path string
+}
+
 func ParseBmcInfo(text string) (SumBMC, error) {
 	var bmc SumBMC
 
@@ -36,4 +40,8 @@ func ParseBmcInfo(text string) (SumBMC, error) {
 	}
 
 	return bmc, nil
+}
+
+func NewSum(path string) *Sum {
+	return &Sum{Path: path}
 }
