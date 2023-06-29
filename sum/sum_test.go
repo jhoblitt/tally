@@ -1,11 +1,10 @@
 package sum
 
 import (
-	"fmt"
 	"testing"
 )
 
-func TestParse(t *testing.T) {
+func TestParseBmcInfo(t *testing.T) {
 	docs := []string{
 		// sum -i <HOST> -u ADMIN -p <pass> -c GetBmcInfo
 		`
@@ -34,7 +33,6 @@ Local BMC image file...../home/jhoblitt/Dropbox/lsst-it/sm/AS-1114S-WN10RT/bmc/B
 `}
 
 	for _, doc := range docs {
-		fmt.Println(doc)
 		bmc, err := ParseBmcInfo(doc)
 		if err != nil {
 			t.Fatalf("unexpected error parsing BMC info: %s", err)
