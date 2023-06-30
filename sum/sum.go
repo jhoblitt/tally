@@ -1,8 +1,12 @@
 package sum
 
 import (
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/jhoblitt/tally/conf"
 )
 
 type SumBMC struct {
@@ -13,7 +17,8 @@ type SumBMC struct {
 }
 
 type Sum struct {
-	Path string
+	ExecCommand func(string, ...string) *exec.Cmd
+	Path        string
 }
 
 func ParseBmcInfo(text string) (SumBMC, error) {
@@ -43,5 +48,33 @@ func ParseBmcInfo(text string) (SumBMC, error) {
 }
 
 func NewSum(path string) *Sum {
-	return &Sum{Path: path}
+	s := &Sum{
+		Path:        path,
+		ExecCommand: exec.Command,
+	}
+	return s
+}
+
+func (s *Sum) Command(creds *conf.TallyCredsConf, arg ...string) ([]byte, error) {
+	if creds != nil {
+		// put the password in a temp file to avoid leaking it on the command line
+		f, err := os.CreateTemp("", "tally")
+		if err != nil {
+			return nil, err
+		}
+		defer os.Remove(f.Name())
+
+		if _, err := f.Write([]byte(creds.Pass)); err != nil {
+			return nil, err
+		}
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
+
+		arg = append(arg, "-u", creds.User, "-p", creds.Pass)
+	}
+
+	cmd := s.ExecCommand(s.Path, arg...)
+
+	return cmd.CombinedOutput()
 }
