@@ -17,6 +17,11 @@ type SumBMC struct {
 	Date    string
 }
 
+type SumBIOSInfo struct {
+	BoardID   string
+	BuildDate string
+}
+
 type Sum struct {
 	ExecCommand func(string, ...string) *exec.Cmd
 	Path        string
@@ -46,6 +51,28 @@ func ParseBmcInfo(text string) (SumBMC, error) {
 	}
 
 	return bmc, nil
+}
+
+func ParseBiosInfo(text string) (SumBIOSInfo, error) {
+	var bios SumBIOSInfo
+
+	re, err := regexp.Compile(`\.{3,}(\S+)$`)
+	if err != nil {
+		return bios, err
+	}
+
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		m := re.FindStringSubmatch(line)
+
+		if strings.Contains(line, "Board ID...") {
+			bios.BoardID = m[1]
+		} else if strings.Contains(line, "BIOS build date...") {
+			bios.BuildDate = m[1]
+		}
+	}
+
+	return bios, nil
 }
 
 func NewSum(path string) *Sum {
