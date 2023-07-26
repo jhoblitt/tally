@@ -24,6 +24,52 @@ func sum_cmd(conf conf.TallyConf, host string, creds conf.TallyCredsConf, cmds .
 	}
 }
 
+type HostUpdate struct {
+	Name          string
+	TargetBmcInfo *sum.SumBMC
+	Creds         *conf.TallyCredsConf
+	Conf          *conf.TallyConf
+	Sum           *sum.Sum
+	Logger        *log.Logger
+}
+
+func bmc_update(host HostUpdate) error {
+	l := host.Logger
+
+	l.Println("checking bmc info")
+
+	out, err := host.Sum.Command(host.Creds, "-i", host.Name, "-c", "GetBmcInfo")
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	bmc_current, err := sum.ParseBmcInfo(string(out))
+	if err != nil {
+		return fmt.Errorf("could not parse bmc info: %w", err)
+	}
+
+	l.Println("bmc info:", bmc_current)
+
+	if bmc_current.Type != host.TargetBmcInfo.Type {
+		return fmt.Errorf("incompatible bmc types")
+	}
+	if bmc_current.Version == host.TargetBmcInfo.Version {
+		l.Println("bmc version already in sync")
+		return nil
+	}
+
+	l.Println("bmc firmware will be upgraded")
+
+	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBMC", "--file", host.Conf.BmcBlob)
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	l.Println(string(out))
+
+	l.Println("bmc firmware upgrade complete")
+
+	return nil
+}
+
 func main() {
 	var use_op = flag.Bool("op", false, "use op (1password cli) to get credentials")
 	flag.Parse()
@@ -37,11 +83,11 @@ func main() {
 	s := sum.NewSum(c.Sum)
 	out, err := s.Command(nil, "-c", "GetBmcInfo", "--file", c.BmcBlob, "--file_only")
 	if err != nil {
-		fmt.Println("could not run command: ", err)
+		log.Fatal("could not run command: ", err)
 	}
 	bmc_target, err := sum.ParseBmcInfo(string(out))
 	if err != nil {
-		fmt.Println("could not parse bmc info: ", err)
+		log.Fatal("could not parse bmc info: ", err)
 	}
 	fmt.Println("bmc info:", bmc_target)
 
@@ -51,6 +97,8 @@ func main() {
 	for host, creds := range c.Hosts {
 		host := host
 		creds := creds
+		// prefix log messages with host name
+		l := log.New(os.Stdout, host+": ", 0)
 
 		// conf file creds take precedence over op creds
 		if creds.User == "" || creds.Pass == "" {
@@ -58,48 +106,26 @@ func main() {
 				item := op.ItemGet(host)
 				creds = op.Item2TallyCreds(item)
 			} else {
-				fmt.Println("no credentials for host:", host)
+				l.Println("no credentials for host:", host)
 				continue
 			}
 		}
 
 		limiter.Execute(func() {
-			//log := log.New(os.Stdout, host, log.LstdFlags)
-			log := log.New(os.Stdout, host+": ", 0)
+			host := HostUpdate{
+				Name:          host,
+				TargetBmcInfo: &bmc_target,
+				Creds:         &creds,
+				Conf:          &c,
+				Sum:           s,
+				Logger:        l,
+			}
 
-			out, _ := s.Command(&creds, "-i", host, "-c", "GetBmcInfo")
+			err = bmc_update(host)
 			if err != nil {
-				log.Println("could not run command: ", err)
+				l.Println("could not update bmc:", err)
 				return
 			}
-
-			bmc_current, err := sum.ParseBmcInfo(string(out))
-			if err != nil {
-				log.Println("could not parse bmc info: ", err)
-				return
-			}
-
-			log.Println("bmc info:", bmc_current)
-
-			if bmc_current.Type != bmc_target.Type {
-				log.Println("incompatible bmc types, skipping")
-				return
-			}
-
-			if bmc_current.Version == bmc_target.Version {
-				log.Println("bmc version already in sync")
-				return
-			}
-
-			log.Println("bmc firmware will be upgraded")
-
-			out, _ = s.Command(&creds, "-i", host, "-c", "UpdateBMC", "--file", c.BmcBlob)
-			if err != nil {
-				log.Println("could not run command: ", err)
-			}
-			log.Println(string(out))
-
-			log.Println("bmc firmware upgrade complete")
 
 			/*
 				sum_cmd(c, host, creds, "-c", "UpdateBMC", "--file", c.BmcBlob)
