@@ -20,6 +20,7 @@ type HostUpdate struct {
 	Conf           *conf.TallyConf
 	Sum            *sum.Sum
 	Logger         *log.Logger
+	Noop           bool
 }
 
 func bmc_update(host HostUpdate) error {
@@ -43,6 +44,11 @@ func bmc_update(host HostUpdate) error {
 	}
 	if bmc_current.Version == host.TargetBmcInfo.Version {
 		l.Println("bmc version already in sync")
+		return nil
+	}
+
+	if host.Noop {
+		l.Println("bmc firmware would be upgraded (noop)")
 		return nil
 	}
 
@@ -83,6 +89,11 @@ func bios_update(host HostUpdate) error {
 		return nil
 	}
 
+	if host.Noop {
+		l.Println("bios would be upgraded (noop)")
+		return nil
+	}
+
 	l.Println("bios will be upgraded")
 
 	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBIOS", "--file", host.Conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
@@ -97,7 +108,8 @@ func bios_update(host HostUpdate) error {
 }
 
 func main() {
-	var use_op = flag.Bool("op", false, "use op (1password cli) to get credentials")
+	use_op := flag.Bool("op", false, "use op (1password cli) to get credentials")
+	noop := flag.Bool("noop", false, "do not apply firmware updates")
 	flag.Parse()
 
 	c := conf.ParseFile("tally.yaml")
@@ -156,6 +168,7 @@ func main() {
 				Conf:           &c,
 				Sum:            s,
 				Logger:         l,
+				Noop:           *noop,
 			}
 
 			err = bmc_update(host)
