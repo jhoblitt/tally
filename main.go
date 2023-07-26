@@ -110,6 +110,7 @@ func bios_update(host HostUpdate) error {
 func main() {
 	use_op := flag.Bool("op", false, "use op (1password cli) to get credentials")
 	noop := flag.Bool("noop", false, "do not apply firmware updates")
+	parallelism := flag.Int("p", 10, "number of hosts to update in parallel")
 	flag.Parse()
 
 	c := conf.ParseFile("tally.yaml")
@@ -139,7 +140,7 @@ func main() {
 	}
 	fmt.Println("bios info:", bios_target)
 
-	limiter := limiter.NewConcurrencyLimiter(10)
+	limiter := limiter.NewConcurrencyLimiter(*parallelism)
 	defer limiter.WaitAndClose()
 
 	for host, creds := range c.Hosts {
