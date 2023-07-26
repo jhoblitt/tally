@@ -1,6 +1,7 @@
 package sum
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
@@ -75,6 +76,9 @@ func (s *Sum) Command(creds *conf.TallyCredsConf, arg ...string) ([]byte, error)
 	}
 
 	cmd := s.ExecCommand(s.Path, arg...)
+	if cmd == nil {
+		return nil, fmt.Errorf("failed to exec command")
+	}
 
 	return cmd.CombinedOutput()
 }
