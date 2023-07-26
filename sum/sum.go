@@ -99,7 +99,7 @@ func (s *Sum) Command(creds *conf.TallyCredsConf, arg ...string) ([]byte, error)
 			return nil, fmt.Errorf("failed running %s: %w", arg, err)
 		}
 
-		arg = append(arg, "-u", creds.User, "-p", creds.Pass)
+		arg = append(arg, "-u", creds.User, "-f", f.Name())
 	}
 
 	cmd := s.ExecCommand(s.Path, arg...)
