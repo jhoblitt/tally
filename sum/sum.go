@@ -10,7 +10,7 @@ import (
 	"github.com/jhoblitt/tally/conf"
 )
 
-type SumBMC struct {
+type SumBmcInfo struct {
 	UFFN    string
 	Type    string
 	Version string
@@ -27,8 +27,8 @@ type Sum struct {
 	Path        string
 }
 
-func ParseBmcInfo(text string) (SumBMC, error) {
-	var bmc SumBMC
+func ParseBmcInfo(text string) (SumBmcInfo, error) {
+	var bmc SumBmcInfo
 
 	re, err := regexp.Compile(`\.{3,}(\S+)$`)
 	if err != nil {

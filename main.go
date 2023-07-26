@@ -14,7 +14,7 @@ import (
 
 type HostUpdate struct {
 	Name           string
-	TargetBmcInfo  *sum.SumBMC
+	TargetBmcInfo  *sum.SumBmcInfo
 	TargetBiosInfo *sum.SumBiosInfo
 	Creds          *conf.TallyCredsConf
 	Conf           *conf.TallyConf
