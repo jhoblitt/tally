@@ -30,7 +30,7 @@ func bmc_update(host HostUpdate) error {
 
 	out, err := host.Sum.Command(host.Creds, "-i", host.Name, "-c", "GetBmcInfo")
 	if err != nil {
-		return fmt.Errorf("could not run command: %w", err)
+		return fmt.Errorf("could not run sum command: %w", err)
 	}
 	bmc_current, err := sum.ParseBmcInfo(string(out))
 	if err != nil {
@@ -56,7 +56,7 @@ func bmc_update(host HostUpdate) error {
 
 	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBMC", "--file", host.Conf.BmcBlob)
 	if err != nil {
-		return fmt.Errorf("could not run command: %w", err)
+		return fmt.Errorf("could not run sum command: %w", err)
 	}
 	l.Println(string(out))
 
@@ -72,7 +72,7 @@ func bios_update(host HostUpdate) error {
 
 	out, err := host.Sum.Command(host.Creds, "-i", host.Name, "-c", "GetBiosInfo")
 	if err != nil {
-		return fmt.Errorf("could not run command: %w", err)
+		return fmt.Errorf("could not run sum command: %w", err)
 	}
 	bios_current, err := sum.ParseBiosInfo(string(out))
 	if err != nil {
@@ -98,7 +98,7 @@ func bios_update(host HostUpdate) error {
 
 	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBIOS", "--file", host.Conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
 	if err != nil {
-		return fmt.Errorf("could not run command: %w", err)
+		return fmt.Errorf("could not run sum command: %w", err)
 	}
 	l.Println(string(out))
 
@@ -122,7 +122,7 @@ func main() {
 	s := sum.NewSum(c.Sum)
 	out, err := s.Command(nil, "-c", "GetBmcInfo", "--file", c.BmcBlob, "--file_only")
 	if err != nil {
-		log.Fatal("could not run command: ", err)
+		log.Fatal("could not run sum command: ", err)
 	}
 	bmc_target, err := sum.ParseBmcInfo(string(out))
 	if err != nil {
@@ -132,7 +132,7 @@ func main() {
 
 	out, err = s.Command(nil, "-c", "GetBiosInfo", "--file", c.BiosBlob, "--file_only")
 	if err != nil {
-		log.Fatal("could not run command: ", err)
+		log.Fatal("could not run sum command: ", err)
 	}
 	bios_target, err := sum.ParseBiosInfo(string(out))
 	if err != nil {
