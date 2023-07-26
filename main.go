@@ -152,7 +152,12 @@ func main() {
 		// conf file creds take precedence over op creds
 		if creds.User == "" || creds.Pass == "" {
 			if *use_op {
-				item := op.ItemGet(host)
+				item, err := op.ItemGet(host)
+				if err != nil {
+					l.Println("could not get credentials from op:", err)
+					continue
+				}
+
 				creds = op.Item2TallyCreds(item)
 			} else {
 				l.Println("no credentials for host:", host)
