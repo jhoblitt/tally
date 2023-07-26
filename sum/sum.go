@@ -17,7 +17,7 @@ type SumBMC struct {
 	Date    string
 }
 
-type SumBIOSInfo struct {
+type SumBiosInfo struct {
 	BoardID   string
 	BuildDate string
 }
@@ -53,8 +53,8 @@ func ParseBmcInfo(text string) (SumBMC, error) {
 	return bmc, nil
 }
 
-func ParseBiosInfo(text string) (SumBIOSInfo, error) {
-	var bios SumBIOSInfo
+func ParseBiosInfo(text string) (SumBiosInfo, error) {
+	var bios SumBiosInfo
 
 	re, err := regexp.Compile(`\.{3,}(\S+)$`)
 	if err != nil {

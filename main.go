@@ -13,12 +13,13 @@ import (
 )
 
 type HostUpdate struct {
-	Name          string
-	TargetBmcInfo *sum.SumBMC
-	Creds         *conf.TallyCredsConf
-	Conf          *conf.TallyConf
-	Sum           *sum.Sum
-	Logger        *log.Logger
+	Name           string
+	TargetBmcInfo  *sum.SumBMC
+	TargetBiosInfo *sum.SumBiosInfo
+	Creds          *conf.TallyCredsConf
+	Conf           *conf.TallyConf
+	Sum            *sum.Sum
+	Logger         *log.Logger
 }
 
 func bmc_update(host HostUpdate) error {
@@ -58,6 +59,43 @@ func bmc_update(host HostUpdate) error {
 	return nil
 }
 
+func bios_update(host HostUpdate) error {
+	l := host.Logger
+
+	l.Println("checking bios info")
+
+	out, err := host.Sum.Command(host.Creds, "-i", host.Name, "-c", "GetBiosInfo")
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	bios_current, err := sum.ParseBiosInfo(string(out))
+	if err != nil {
+		return fmt.Errorf("could not parse bios info: %w", err)
+	}
+
+	l.Println("bios info:", bios_current)
+
+	if bios_current.BoardID != host.TargetBiosInfo.BoardID {
+		return fmt.Errorf("incompatible Board Ids")
+	}
+	if bios_current.BuildDate == host.TargetBiosInfo.BuildDate {
+		l.Println("bios build date already in sync")
+		return nil
+	}
+
+	l.Println("bios will be upgraded")
+
+	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBIOS", "--file", host.Conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	l.Println(string(out))
+
+	l.Println("bios upgrade complete")
+
+	return nil
+}
+
 func main() {
 	var use_op = flag.Bool("op", false, "use op (1password cli) to get credentials")
 	flag.Parse()
@@ -78,6 +116,16 @@ func main() {
 		log.Fatal("could not parse bmc info: ", err)
 	}
 	fmt.Println("bmc info:", bmc_target)
+
+	out, err = s.Command(nil, "-c", "GetBiosInfo", "--file", c.BiosBlob, "--file_only")
+	if err != nil {
+		log.Fatal("could not run command: ", err)
+	}
+	bios_target, err := sum.ParseBiosInfo(string(out))
+	if err != nil {
+		log.Fatal("could not parse bios info: ", err)
+	}
+	fmt.Println("bios info:", bios_target)
 
 	limiter := limiter.NewConcurrencyLimiter(10)
 	defer limiter.WaitAndClose()
@@ -101,12 +149,13 @@ func main() {
 
 		limiter.Execute(func() {
 			host := HostUpdate{
-				Name:          host,
-				TargetBmcInfo: &bmc_target,
-				Creds:         &creds,
-				Conf:          &c,
-				Sum:           s,
-				Logger:        l,
+				Name:           host,
+				TargetBmcInfo:  &bmc_target,
+				TargetBiosInfo: &bios_target,
+				Creds:          &creds,
+				Conf:           &c,
+				Sum:            s,
+				Logger:         l,
 			}
 
 			err = bmc_update(host)
@@ -115,10 +164,11 @@ func main() {
 				return
 			}
 
-			/*
-				sum_cmd(c, host, creds, "-c", "UpdateBMC", "--file", c.BmcBlob)
-				sum_cmd(c, host, creds, "-c", "UpdateBios", "--file", c.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
-			*/
+			err = bios_update(host)
+			if err != nil {
+				l.Println("could not update bios:", err)
+				return
+			}
 		})
 	}
 }
