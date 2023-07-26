@@ -5,24 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 
 	"github.com/jhoblitt/tally/conf"
 	"github.com/jhoblitt/tally/op"
 	"github.com/jhoblitt/tally/sum"
 	"github.com/korovkin/limiter"
 )
-
-func sum_cmd(conf conf.TallyConf, host string, creds conf.TallyCredsConf, cmds ...string) {
-	fmt.Println("running sum command on host:", host)
-
-	args := append([]string{"-i", host, "-u", creds.User, "-p", creds.Pass}, cmds...)
-	cmd := exec.Command(conf.Sum, args...)
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		fmt.Println("could not run command: ", err)
-	}
-}
 
 type HostUpdate struct {
 	Name          string
