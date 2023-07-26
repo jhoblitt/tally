@@ -88,15 +88,15 @@ func (s *Sum) Command(creds *conf.TallyCredsConf, arg ...string) ([]byte, error)
 		// put the password in a temp file to avoid leaking it on the command line
 		f, err := os.CreateTemp("", "tally")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed running %s: %w", arg, err)
 		}
 		defer os.Remove(f.Name())
 
 		if _, err := f.Write([]byte(creds.Pass)); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed running %s: %w", arg, err)
 		}
 		if err := f.Close(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed running %s: %w", arg, err)
 		}
 
 		arg = append(arg, "-u", creds.User, "-p", creds.Pass)
@@ -104,8 +104,13 @@ func (s *Sum) Command(creds *conf.TallyCredsConf, arg ...string) ([]byte, error)
 
 	cmd := s.ExecCommand(s.Path, arg...)
 	if cmd == nil {
-		return nil, fmt.Errorf("failed to exec command")
+		return nil, fmt.Errorf("failed running %s", arg)
 	}
 
-	return cmd.CombinedOutput()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed running %s: %w", arg, err)
+	}
+
+	return out, nil
 }

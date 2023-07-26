@@ -2,6 +2,7 @@ package op
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os/exec"
 
@@ -18,21 +19,20 @@ type OpField struct {
 	Value string `json:"value"`
 }
 
-func ItemGet(name string) OpItem {
+func ItemGet(name string) (*OpItem, error) {
 	cmd := exec.Command("/usr/bin/op", "item", "get", name, "--format", "json")
 	out, err := cmd.CombinedOutput()
-	//fmt.Printf("%s\n", out)
 	if err != nil {
-		log.Fatal("could not run command: ", err)
+		return nil, fmt.Errorf("could not find item: %s - %w", name, err)
 	}
 
 	var item OpItem
 	json.Unmarshal(out, &item)
 
-	return item
+	return &item, nil
 }
 
-func Item2TallyCreds(item OpItem) conf.TallyCredsConf {
+func Item2TallyCreds(item *OpItem) conf.TallyCredsConf {
 	var cred conf.TallyCredsConf
 	for _, field := range item.Fields {
 		if field.Id == "username" {
