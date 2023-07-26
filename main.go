@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 
 	"github.com/jhoblitt/tally/conf"
 	"github.com/jhoblitt/tally/op"
+	"github.com/jhoblitt/tally/sum"
 	"github.com/korovkin/limiter"
 )
 
@@ -32,6 +34,17 @@ func main() {
 	fmt.Println("path to bmc blob:", c.BmcBlob)
 	fmt.Println("path to bios blob:", c.BiosBlob)
 
+	s := sum.NewSum(c.Sum)
+	out, err := s.Command(nil, "-c", "GetBmcInfo", "--file", c.BmcBlob, "--file_only")
+	if err != nil {
+		fmt.Println("could not run command: ", err)
+	}
+	bmc_target, err := sum.ParseBmcInfo(string(out))
+	if err != nil {
+		fmt.Println("could not parse bmc info: ", err)
+	}
+	fmt.Println("bmc info:", bmc_target)
+
 	limiter := limiter.NewConcurrencyLimiter(10)
 	defer limiter.WaitAndClose()
 
@@ -51,10 +64,47 @@ func main() {
 		}
 
 		limiter.Execute(func() {
-			sum_cmd(c, host, creds, "-c", "GetBmcInfo")
-			sum_cmd(c, host, creds, "-c", "GetBiosInfo")
-			sum_cmd(c, host, creds, "-c", "UpdateBMC", "--file", c.BmcBlob)
-			sum_cmd(c, host, creds, "-c", "UpdateBios", "--file", c.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
+			//log := log.New(os.Stdout, host, log.LstdFlags)
+			log := log.New(os.Stdout, host+": ", 0)
+
+			out, _ := s.Command(&creds, "-i", host, "-c", "GetBmcInfo")
+			if err != nil {
+				log.Println("could not run command: ", err)
+				return
+			}
+
+			bmc_current, err := sum.ParseBmcInfo(string(out))
+			if err != nil {
+				log.Println("could not parse bmc info: ", err)
+				return
+			}
+
+			log.Println("bmc info:", bmc_current)
+
+			if bmc_current.Type != bmc_target.Type {
+				log.Println("incompatible bmc types, skipping")
+				return
+			}
+
+			if bmc_current.Version == bmc_target.Version {
+				log.Println("bmc version already in sync")
+				return
+			}
+
+			log.Println("bmc firmware will be upgraded")
+
+			out, _ = s.Command(&creds, "-i", host, "-c", "UpdateBMC", "--file", c.BmcBlob)
+			if err != nil {
+				log.Println("could not run command: ", err)
+			}
+			log.Println(string(out))
+
+			log.Println("bmc firmware upgrade complete")
+
+			/*
+				sum_cmd(c, host, creds, "-c", "UpdateBMC", "--file", c.BmcBlob)
+				sum_cmd(c, host, creds, "-c", "UpdateBios", "--file", c.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
+			*/
 		})
 	}
 }
