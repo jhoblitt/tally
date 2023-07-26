@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 
 	"github.com/jhoblitt/tally/conf"
 	"github.com/jhoblitt/tally/op"
@@ -13,15 +12,88 @@ import (
 	"github.com/korovkin/limiter"
 )
 
-func sum_cmd(conf conf.TallyConf, host string, creds conf.TallyCredsConf, cmds ...string) {
-	fmt.Println("running sum command on host:", host)
+type HostUpdate struct {
+	Name           string
+	TargetBmcInfo  *sum.SumBmcInfo
+	TargetBiosInfo *sum.SumBiosInfo
+	Creds          *conf.TallyCredsConf
+	Conf           *conf.TallyConf
+	Sum            *sum.Sum
+	Logger         *log.Logger
+}
 
-	args := append([]string{"-i", host, "-u", creds.User, "-p", creds.Pass}, cmds...)
-	cmd := exec.Command(conf.Sum, args...)
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		fmt.Println("could not run command: ", err)
+func bmc_update(host HostUpdate) error {
+	l := host.Logger
+
+	l.Println("checking bmc info")
+
+	out, err := host.Sum.Command(host.Creds, "-i", host.Name, "-c", "GetBmcInfo")
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
 	}
+	bmc_current, err := sum.ParseBmcInfo(string(out))
+	if err != nil {
+		return fmt.Errorf("could not parse bmc info: %w", err)
+	}
+
+	l.Println("bmc info:", bmc_current)
+
+	if bmc_current.Type != host.TargetBmcInfo.Type {
+		return fmt.Errorf("incompatible bmc types")
+	}
+	if bmc_current.Version == host.TargetBmcInfo.Version {
+		l.Println("bmc version already in sync")
+		return nil
+	}
+
+	l.Println("bmc firmware will be upgraded")
+
+	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBMC", "--file", host.Conf.BmcBlob)
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	l.Println(string(out))
+
+	l.Println("bmc firmware upgrade complete")
+
+	return nil
+}
+
+func bios_update(host HostUpdate) error {
+	l := host.Logger
+
+	l.Println("checking bios info")
+
+	out, err := host.Sum.Command(host.Creds, "-i", host.Name, "-c", "GetBiosInfo")
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	bios_current, err := sum.ParseBiosInfo(string(out))
+	if err != nil {
+		return fmt.Errorf("could not parse bios info: %w", err)
+	}
+
+	l.Println("bios info:", bios_current)
+
+	if bios_current.BoardID != host.TargetBiosInfo.BoardID {
+		return fmt.Errorf("incompatible Board Ids")
+	}
+	if bios_current.BuildDate == host.TargetBiosInfo.BuildDate {
+		l.Println("bios build date already in sync")
+		return nil
+	}
+
+	l.Println("bios will be upgraded")
+
+	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBIOS", "--file", host.Conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
+	if err != nil {
+		return fmt.Errorf("could not run command: %w", err)
+	}
+	l.Println(string(out))
+
+	l.Println("bios upgrade complete")
+
+	return nil
 }
 
 func main() {
@@ -37,13 +109,23 @@ func main() {
 	s := sum.NewSum(c.Sum)
 	out, err := s.Command(nil, "-c", "GetBmcInfo", "--file", c.BmcBlob, "--file_only")
 	if err != nil {
-		fmt.Println("could not run command: ", err)
+		log.Fatal("could not run command: ", err)
 	}
 	bmc_target, err := sum.ParseBmcInfo(string(out))
 	if err != nil {
-		fmt.Println("could not parse bmc info: ", err)
+		log.Fatal("could not parse bmc info: ", err)
 	}
 	fmt.Println("bmc info:", bmc_target)
+
+	out, err = s.Command(nil, "-c", "GetBiosInfo", "--file", c.BiosBlob, "--file_only")
+	if err != nil {
+		log.Fatal("could not run command: ", err)
+	}
+	bios_target, err := sum.ParseBiosInfo(string(out))
+	if err != nil {
+		log.Fatal("could not parse bios info: ", err)
+	}
+	fmt.Println("bios info:", bios_target)
 
 	limiter := limiter.NewConcurrencyLimiter(10)
 	defer limiter.WaitAndClose()
@@ -51,6 +133,8 @@ func main() {
 	for host, creds := range c.Hosts {
 		host := host
 		creds := creds
+		// prefix log messages with host name
+		l := log.New(os.Stdout, host+": ", 0)
 
 		// conf file creds take precedence over op creds
 		if creds.User == "" || creds.Pass == "" {
@@ -58,53 +142,33 @@ func main() {
 				item := op.ItemGet(host)
 				creds = op.Item2TallyCreds(item)
 			} else {
-				fmt.Println("no credentials for host:", host)
+				l.Println("no credentials for host:", host)
 				continue
 			}
 		}
 
 		limiter.Execute(func() {
-			//log := log.New(os.Stdout, host, log.LstdFlags)
-			log := log.New(os.Stdout, host+": ", 0)
+			host := HostUpdate{
+				Name:           host,
+				TargetBmcInfo:  &bmc_target,
+				TargetBiosInfo: &bios_target,
+				Creds:          &creds,
+				Conf:           &c,
+				Sum:            s,
+				Logger:         l,
+			}
 
-			out, _ := s.Command(&creds, "-i", host, "-c", "GetBmcInfo")
+			err = bmc_update(host)
 			if err != nil {
-				log.Println("could not run command: ", err)
+				l.Println("could not update bmc:", err)
 				return
 			}
 
-			bmc_current, err := sum.ParseBmcInfo(string(out))
+			err = bios_update(host)
 			if err != nil {
-				log.Println("could not parse bmc info: ", err)
+				l.Println("could not update bios:", err)
 				return
 			}
-
-			log.Println("bmc info:", bmc_current)
-
-			if bmc_current.Type != bmc_target.Type {
-				log.Println("incompatible bmc types, skipping")
-				return
-			}
-
-			if bmc_current.Version == bmc_target.Version {
-				log.Println("bmc version already in sync")
-				return
-			}
-
-			log.Println("bmc firmware will be upgraded")
-
-			out, _ = s.Command(&creds, "-i", host, "-c", "UpdateBMC", "--file", c.BmcBlob)
-			if err != nil {
-				log.Println("could not run command: ", err)
-			}
-			log.Println(string(out))
-
-			log.Println("bmc firmware upgrade complete")
-
-			/*
-				sum_cmd(c, host, creds, "-c", "UpdateBMC", "--file", c.BmcBlob)
-				sum_cmd(c, host, creds, "-c", "UpdateBios", "--file", c.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
-			*/
 		})
 	}
 }

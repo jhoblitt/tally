@@ -10,11 +10,16 @@ import (
 	"github.com/jhoblitt/tally/conf"
 )
 
-type SumBMC struct {
+type SumBmcInfo struct {
 	UFFN    string
 	Type    string
 	Version string
 	Date    string
+}
+
+type SumBiosInfo struct {
+	BoardID   string
+	BuildDate string
 }
 
 type Sum struct {
@@ -22,8 +27,8 @@ type Sum struct {
 	Path        string
 }
 
-func ParseBmcInfo(text string) (SumBMC, error) {
-	var bmc SumBMC
+func ParseBmcInfo(text string) (SumBmcInfo, error) {
+	var bmc SumBmcInfo
 
 	re, err := regexp.Compile(`\.{3,}(\S+)$`)
 	if err != nil {
@@ -46,6 +51,28 @@ func ParseBmcInfo(text string) (SumBMC, error) {
 	}
 
 	return bmc, nil
+}
+
+func ParseBiosInfo(text string) (SumBiosInfo, error) {
+	var bios SumBiosInfo
+
+	re, err := regexp.Compile(`\.{3,}(\S+)$`)
+	if err != nil {
+		return bios, err
+	}
+
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		m := re.FindStringSubmatch(line)
+
+		if strings.Contains(line, "Board ID...") {
+			bios.BoardID = m[1]
+		} else if strings.Contains(line, "BIOS build date...") {
+			bios.BuildDate = m[1]
+		}
+	}
+
+	return bios, nil
 }
 
 func NewSum(path string) *Sum {
