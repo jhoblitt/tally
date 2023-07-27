@@ -111,9 +111,10 @@ func main() {
 	use_op := flag.Bool("op", false, "use op (1password cli) to get credentials")
 	noop := flag.Bool("noop", false, "do not apply firmware updates")
 	parallelism := flag.Int("p", 10, "number of hosts to update in parallel")
+	conf_file := flag.String("conf", "tally.yaml", "tally configuration file (YAML)")
 	flag.Parse()
 
-	c := conf.ParseFile("tally.yaml")
+	c := conf.ParseFile(*conf_file)
 
 	fmt.Println("path to sum command:", c.Sum)
 	fmt.Println("path to bmc blob:", c.BmcBlob)
