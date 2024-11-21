@@ -2,6 +2,7 @@ package sum
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -101,6 +102,8 @@ func (s *Sum) Command(creds *conf.TallyCredsConf, arg ...string) ([]byte, error)
 
 		arg = append(arg, "-u", creds.User, "-f", f.Name())
 	}
+
+	log.Printf("running: %s %s", s.Path, strings.Join(arg, " "))
 
 	cmd := s.ExecCommand(s.Path, arg...)
 	if cmd == nil {
