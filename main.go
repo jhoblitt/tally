@@ -54,7 +54,7 @@ func bmc_update(host HostUpdate) error {
 
 	l.Println("bmc firmware will be upgraded")
 
-	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBMC", "--file", host.Conf.BmcBlob)
+	out, err = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBMC", "--file", host.Conf.BmcBlob)
 	if err != nil {
 		return fmt.Errorf("could not run sum command: %w", err)
 	}
@@ -96,7 +96,7 @@ func bios_update(host HostUpdate) error {
 
 	l.Println("bios will be upgraded")
 
-	out, _ = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBIOS", "--file", host.Conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
+	out, err = host.Sum.Command(host.Creds, "-i", host.Name, "-c", "UpdateBIOS", "--file", host.Conf.BiosBlob, "--reboot", "--preserve_setting", "--post_complete")
 	if err != nil {
 		return fmt.Errorf("could not run sum command: %w", err)
 	}
