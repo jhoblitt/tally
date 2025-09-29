@@ -110,6 +110,8 @@ func bios_update(host HostUpdate) error {
 func main() {
 	use_op := flag.Bool("op", false, "use op (1password cli) to get credentials")
 	noop := flag.Bool("noop", false, "do not apply firmware updates")
+	bios := flag.Bool("bios", false, "update bios")
+	bmc := flag.Bool("bmc", false, "update bmc")
 	parallelism := flag.Int("p", 10, "number of hosts to update in parallel")
 	conf_file := flag.String("conf", "tally.yaml", "tally configuration file (YAML)")
 	flag.Parse()
@@ -178,16 +180,20 @@ func main() {
 				Noop:           *noop,
 			}
 
-			err = bmc_update(host)
-			if err != nil {
-				l.Println("could not update bmc:", err)
-				return
+			if *bmc {
+				err = bmc_update(host)
+				if err != nil {
+					l.Println("could not update bmc:", err)
+					return
+				}
 			}
 
-			err = bios_update(host)
-			if err != nil {
-				l.Println("could not update bios:", err)
-				return
+			if *bios {
+				err = bios_update(host)
+				if err != nil {
+					l.Println("could not update bios:", err)
+					return
+				}
 			}
 		})
 	}
